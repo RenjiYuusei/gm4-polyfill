@@ -6,7 +6,7 @@
  * Usage:
  * // @grant GM.getValue
  * // @grant GM_getValue 
- * // @require https://github.com/RenjiYuusei/gm4-polyfill/raw/refs/heads/master/gm4-polyfill.js
+ * // @require https://raw.githubusercontent.com/RenjiYuusei/gm4-polyfill/refs/heads/master/gm4-polyfill.js
  */
 
 (() => {
