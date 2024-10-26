@@ -12,7 +12,7 @@
 (() => {
   'use strict';
 
-  // Initialize GM object if not exists
+  // Initialize GM object if not exists.
   if (typeof GM === 'undefined') {
     window.GM = {};
   }
