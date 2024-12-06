@@ -1,5 +1,5 @@
 /**
- * GM4-Polyfill - A compatibility layer for Greasemonkey 4 APIs
+ * GM4-Polyfill - Compatibility layer for Greasemonkey 4 API
  * This script provides compatibility between Greasemonkey 4 and legacy APIs,
  * allowing scripts to use modern GM.* APIs while maintaining backwards compatibility.
  * 
@@ -12,8 +12,8 @@
 (() => {
   'use strict';
 
-  // Initialize GM object if not exists.
-  if (typeof GM === 'undefined') {
+  // Initialize GM object if it doesn't exist
+  if (!window.GM) {
     window.GM = {};
   }
 
@@ -28,31 +28,31 @@
     promisify(fn, ...args) {
       return new Promise((resolve, reject) => {
         try {
-          resolve(fn.apply(this, args));
-        } catch (e) {
-          reject(e);
+          resolve(fn.apply(this, args)); 
+        } catch (error) {
+          reject(error);
         }
       });
     },
 
     /**
      * Waits for document.body to be available
-     * @returns {Promise}
+     * @returns {Promise<HTMLElement>}
      */
     waitForBody() {
-      return new Promise((resolve) => {
+      return new Promise(resolve => {
         if (document.body) {
-          resolve(document.body);
-          return;
+          return resolve(document.body);
         }
 
         if (document.readyState === 'loading' && document.documentElement) {
-          new MutationObserver((mutations, observer) => {
+          const observer = new MutationObserver((_, observer) => {
             if (document.body) {
               observer.disconnect();
               resolve(document.body);
             }
-          }).observe(document.documentElement, { childList: true });
+          });
+          observer.observe(document.documentElement, { childList: true });
         }
       });
     }
@@ -60,97 +60,103 @@
 
   // Polyfill implementations
   const polyfills = {
-    // Style injection polyfill
+    // Polyfill for adding styles
     GM_addStyle(css) {
-      const head = document.getElementsByTagName('head')[0];
+      const head = document.head;
       if (!head) return null;
 
       const style = document.createElement('style');
-      style.setAttribute('type', 'text/css');
+      style.type = 'text/css';
       style.textContent = css;
       head.appendChild(style);
       return style;
     },
 
-    // Menu command registration polyfill
+    // Polyfill for registering menu commands
     async GM_registerMenuCommand(caption, commandFunc, accessKey) {
       try {
         const body = await utils.waitForBody();
         
-        let contextMenu = body.getAttribute('contextmenu');
-        let menu = contextMenu ? document.querySelector(`menu#${contextMenu}`) : null;
+        const menuId = 'gm-registered-menu';
+        let menu = document.getElementById(menuId);
 
         if (!menu) {
           menu = document.createElement('menu');
-          menu.setAttribute('id', 'gm-registered-menu');
-          menu.setAttribute('type', 'context');
+          menu.id = menuId;
+          menu.type = 'context';
           body.appendChild(menu);
-          body.setAttribute('contextmenu', 'gm-registered-menu');
+          body.contextMenu = menuId;
         }
 
         const menuItem = document.createElement('menuitem');
         menuItem.textContent = caption;
-        menuItem.addEventListener('click', commandFunc, true);
+        menuItem.addEventListener('click', commandFunc, { once: true });
         menu.appendChild(menuItem);
+
+        return menuItem;
       } catch (error) {
-        console.error('Failed to register menu command:', error);
+        console.error('Error registering menu command:', error);
+        return null;
       }
     },
 
-    // Resource text retrieval polyfill
+    // Polyfill for getting resource content
     async GM_getResourceText(resourceId) {
       try {
         const url = await GM.getResourceUrl(resourceId);
         const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         return await response.text();
       } catch (error) {
-        console.error('Failed to get resource text:', error);
+        console.error('Error getting resource text:', error);
         return null;
       }
     }
   };
 
-  // Direct property mappings
+  // Direct API mappings
   const directMappings = {
-    'log': console.log.bind(console),
-    'info': GM_info
+    log: console.log.bind(console),
+    info: GM_info
   };
 
   // Apply direct mappings
-  Object.entries(directMappings).forEach(([newKey, old]) => {
-    if (old && typeof GM[newKey] === 'undefined') {
+  for (const [newKey, old] of Object.entries(directMappings)) {
+    if (old && !GM[newKey]) {
       GM[newKey] = old;
     }
-  });
+  }
 
-  // Legacy to Promise-based API mappings
+  // Map legacy APIs to Promise-based APIs
   const promiseMappings = {
-    'GM_addStyle': 'addStyle',
-    'GM_deleteValue': 'deleteValue',
-    'GM_getResourceURL': 'getResourceUrl',
-    'GM_getValue': 'getValue',
-    'GM_listValues': 'listValues',
-    'GM_notification': 'notification',
-    'GM_openInTab': 'openInTab',
-    'GM_registerMenuCommand': 'registerMenuCommand',
-    'GM_setClipboard': 'setClipboard',
-    'GM_setValue': 'setValue',
-    'GM_xmlhttpRequest': 'xmlHttpRequest',
-    'GM_getResourceText': 'getResourceText'
+    GM_addStyle: 'addStyle',
+    GM_deleteValue: 'deleteValue', 
+    GM_getResourceURL: 'getResourceUrl',
+    GM_getValue: 'getValue',
+    GM_listValues: 'listValues',
+    GM_notification: 'notification',
+    GM_openInTab: 'openInTab',
+    GM_registerMenuCommand: 'registerMenuCommand',
+    GM_setClipboard: 'setClipboard',
+    GM_setValue: 'setValue',
+    GM_xmlhttpRequest: 'xmlHttpRequest',
+    GM_getResourceText: 'getResourceText'
   };
 
   // Apply polyfills first
-  Object.entries(polyfills).forEach(([key, implementation]) => {
+  for (const [key, implementation] of Object.entries(polyfills)) {
     if (typeof window[key] === 'undefined') {
       window[key] = implementation;
     }
-  });
+  }
 
-  // Convert legacy functions to promise-based API
-  Object.entries(promiseMappings).forEach(([oldKey, newKey]) => {
+  // Convert legacy functions to Promise-based API
+  for (const [oldKey, newKey] of Object.entries(promiseMappings)) {
     const old = window[oldKey];
-    if (old && typeof GM[newKey] === 'undefined') {
+    if (old && !GM[newKey]) {
       GM[newKey] = (...args) => utils.promisify(old, ...args);
     }
-  });
+  }
 })();
